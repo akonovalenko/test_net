@@ -258,3 +258,7 @@ The console output will show BTC prices, retry attempts, adaptive throttling tra
 - Stream materialization
 
 - Graceful completion semantics
+
+
+
+<img width="2047" height="1050" alt="AdaptiveThrotling" src="https://github.com/user-attachments/assets/03cf58c3-f5d9-46b5-8345-cacf507c1a15" />
