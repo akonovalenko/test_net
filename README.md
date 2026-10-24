@@ -1,264 +1,324 @@
-# 🚀 Hybrid Throttling Demo: Adaptive Rate Limiting with Akka.NET Streams
+# MarketRateInfo
 
-A demonstration of a **hybrid throttling strategy** for resilient HTTP data processing, combining a fixed throughput limit with adaptive backoff that reacts to downstream failures. The implementation uses **Akka.NET Streams** in **.NET 10** as the streaming engine.
+MarketRateInfo is a full-stack application built with **ASP.NET Core 10**, **Vue 3**, **TypeScript**, **Entity Framework Core**, and **SQLite**.
 
-The application uses historical Bitcoin (BTC) price requests to demonstrate how hybrid throttling behaves under normal load, transient `429 Too Many Requests` responses, retries, and downstream recovery. The focus is the **throttling and resilience model**, not the Bitcoin API itself.
+The project provides a clean starting point for a market-rates application with a separate Data Access Layer, API, state management, UI components, and automated tests for both backend and frontend.
 
-- backpressure-aware ingestion,
+## Technology Stack
 
-- hybrid throttling,
+### Backend
 
-- retry with adaptive backoff,
+* .NET 10 / ASP.NET Core Web API
+* C#
+* Entity Framework Core 10
+* SQLite
+* Dependency Injection
+* OpenAPI
+* ASP.NET Core SPA Proxy
 
-- consecutive-failure circuit breaking,
+### Data Access Layer
 
-- graceful stream shutdown,
-
-- and downstream recovery observability.
-
----
-
-# 🌟 Key Features & Architectural Highlights
-
-## Core Concept: Hybrid Throttling
-
-The application combines two complementary throttling layers:
-
-- **Akka `Throttle`** — hard rate limit (**1 request/second**).
-
-- **`AdaptiveThrottle`** — soft throttling activated only during downstream degradation.
-
-The fixed Akka throttle controls the normal request rate, while the adaptive throttle dynamically increases the delay only when the downstream service starts failing. This separates baseline rate limiting from failure-driven backoff.
-
-## Adaptive Backoff Strategy
-
-Failure sequence:
+The backend uses a dedicated Data Access Layer:
 
 ```text
-0s → 10s → 20s → 40s → 60s
+MarketRateInfo.Server/
+└── DataAccess/
+    ├── Entities/
+    │   └── MarketRate.cs
+    ├── Repositories/
+    │   ├── IMarketRateRepository.cs
+    │   └── MarketRateRepository.cs
+    ├── MarketRateDbContext.cs
+    └── DatabaseInitializer.cs
 ```
 
-Each failed HTTP request increases the adaptive delay before the next request.
+The repository layer isolates EF Core and SQLite access from controllers and application code.
 
-Recovery sequence:
+SQLite is configured through `DefaultConnection` in `appsettings.json` and defaults to:
 
 ```text
-60s → 0s
-40s → 0s
-20s → 0s
-10s → 0s
+App\_Data/marketrateinfo.db
 ```
 
-A successful HTTP request completely resets the adaptive throttle to `0s`.
-The error counter is reset to `0` at the same time.
+The database is initialized automatically when the application starts and contains initial market-rate data for development.
 
-## Consecutive Error Circuit Breaker
+### Frontend
 
-The stream tracks **consecutive HTTP failures**. After the configured threshold is reached, the pipeline is gracefully stopped through `SharedKillSwitch`.
+* Vue 3
+* TypeScript
+* Vite
+* Pinia
+* PrimeVue
+* PrimeVue Aura theme
+* Tailwind CSS 4
+* Vue Test Library
+* Vitest
+* jsdom
 
-The counter is **reset immediately after the first successful response**, so recovery starts a new error series.
-
-## Graceful Stream Termination
-
-`SharedKillSwitch.Shutdown()` completes the stream without faulting the materialized task, allowing clean shutdown and deterministic logging.
-
-## Backpressure Management
-
-Input is pushed through `Source.Queue` with `OverflowStrategy.Backpressure`, so upstream producers automatically slow down when downstream processing becomes slower.
-
-## Downstream Recovery Observability
-
-When a successful response resets the adaptive throttle to `0s`, the application emits a recovery event and logs how long the downstream service remained degraded.
-
-The runtime metrics endpoint exposes the current adaptive throttle delay through `ThrottleDelayMs`. This represents the actual delay configured by `AdaptiveThrottle` and shows the `0 / 10 / 20 / 40 / 60` second backoff states in Grafana.
-
----
-
-# 🏗️ Stream Architecture Flow
+The frontend source is organized as:
 
 ```text
-[ Source.Queue ]
-        │
-        ▼
-[ Akka Throttle (1 req/sec) ]
-        │
-        ▼
-[ SelectAsync(1) ]
-        │
-        ▼
-[ AdaptiveThrottle ]
-        │
-        ▼
-[ HTTP Request ]
-        │
-        ▼
-[ SharedKillSwitch.Flow ]
-        │
-        ▼
-[ Sink.ForEach ]
+marketrateinfo.client/
+└── src/
+    ├── assets/
+    ├── stores/
+    │   └── app.ts
+    ├── views/
+    │   └── Home.vue
+    ├── App.vue
+    ├── main.ts
+    └── vite-env.d.ts
 ```
 
-The pipeline is intentionally **linear**. `SelectAsync(1)` guarantees that only one HTTP request is in flight at any moment, which greatly simplifies retry and throttling logic.
-
----
-
-# 🔄 Request Processing Lifecycle
-
-## Normal operation
+## Solution Structure
 
 ```text
-Throttle 1s → Request → Success
+MarketRateInfo/
+│
+├── MarketRateInfo.sln
+│
+├── MarketRateInfo.Server/
+│   ├── Controllers/
+│   ├── DataAccess/
+│   │   ├── Entities/
+│   │   ├── Repositories/
+│   │   ├── DatabaseInitializer.cs
+│   │   └── MarketRateDbContext.cs
+│   ├── App\_Data/
+│   ├── Program.cs
+│   └── appsettings.json
+│
+├── MarketRateInfo.Server.Tests/
+│   ├── HomeControllerTests.cs
+│   ├── MarketRateRepositoryTests.cs
+│   └── MarketRateInfo.Server.Tests.csproj
+│
+└── marketrateinfo.client/
+    ├── src/
+    ├── tests/
+    │   ├── Home.test.ts
+    │   └── setup.ts
+    ├── package.json
+    ├── vite.config.ts
+    ├── vitest.config.ts
+    ├── tsconfig.json
+    └── marketrateinfo.client.esproj
 ```
 
-## Transient failure
+## Prerequisites
 
-```text
-Request → 429 → AdaptiveThrottle=10s → Retry
+Install:
+
+* .NET 10 SDK
+* Node.js 22.18+ or Node.js 24.12+
+* npm
+
+Check the installed versions:
+
+```bash
+dotnet --version
+node --version
+npm --version
 ```
 
-## Persistent failure
+## Running the Application
 
-```text
-429 → 10s
-429 → 20s
-429 → 40s
-429 → 60s
-429 → KillSwitch
-```
+### 1\. Restore backend dependencies
 
-## Recovery
-
-```text
-Success → Error counter reset to 0
-Success → AdaptiveThrottle reset to 0s
-```
-
----
-
-# 📋 Example Logs
-
-## Successful requests
-
-```text
-[19:05:29] [INFO] 2026-07-15: BTC = 64983.519074 USD
-[19:05:32] [INFO] 2026-07-16: BTC = 64717.168891 USD
-```
-
-## Retry after throttling
-
-```text
-[19:05:33] [THROTTLE] Increased to 10s
-[19:05:33] [ERROR] 2026-07-18: 429 Too Many Requests. Consecutive error #1/4
-[19:05:43] [THROTTLE] Waiting 10s
-[19:05:43] [RETRY] 2026-07-18, attempt 2
-```
-
-## Downstream recovery
-
-```text
-[19:05:33] [THROTTLE] Disabled
-[19:05:33] [INFO] Downstream recovered after 42s
-```
-
-## Graceful shutdown
-
-```text
-[19:05:44] [KILLSWITCH] Error limit reached. Shutting down stream...
-[WARN] Processing stopped due to too many consecutive HTTP errors.
-```
-
----
-
-# ⚙️ Current Runtime Configuration
-
-| Setting                 | Value            |
-| ----------------------- | ---------------- |
-| Hard throttle           | 1 request/second |
-| Adaptive throttle max   | 60 seconds       |
-| Max consecutive errors  | 4                |
-| Max retries per request | 4                |
-| Days fetched            | 30               |
-| Queue capacity          | 100              |
-| Parallelism             | 1                |
-
----
-
-# 🧠 Why This Design?
-
-The implementation intentionally separates the responsibilities of fixed rate limiting, adaptive backoff, retry handling, circuit breaking, and stream flow control:
-
-| Concern             | Component                 |
-| ------------------- | ------------------------- |
-| Hard API protection | Akka `Throttle`           |
-| Dynamic slowdown    | `AdaptiveThrottle`        |
-| Retry policy        | `SelectAsync` worker      |
-| Circuit breaking    | Consecutive error counter |
-| Graceful shutdown   | `SharedKillSwitch`        |
-| Flow control        | Akka backpressure         |
-
-This mirrors real-world streaming systems where throughput control, resilience, and failure handling are independent concerns.
-
----
-
-# 🧪 What This Repository Demonstrates
-
-- Hybrid throttling: fixed rate limiting + adaptive backoff
-- Adaptive backoff and complete recovery reset
-- Real runtime throttle state exposed through `ThrottleDelayMs`
-- Akka Streams backpressure semantics
-
-- `Source.Queue` ingestion patterns
-
-- Sequential async processing with `SelectAsync(1)`
-
-- Hybrid throttling design
-
-- Exponential backoff
-
-- Consecutive-failure circuit breaker
-
-- Graceful shutdown with `SharedKillSwitch`
-
-- Recovery observability and telemetry-friendly logging
-- Runtime exposure of adaptive throttle state through `ThrottleDelayMs`
-
----
-
-# ▶️ Running
+From the solution directory:
 
 ```bash
 dotnet restore
-dotnet run
 ```
 
-The console output will show BTC prices, retry attempts, adaptive throttling transitions, and graceful shutdown behavior when the error threshold is exceeded.
+### 2\. Install frontend dependencies
 
----
+```bash
+cd marketrateinfo.client
+npm install
+cd ..
+```
 
-# 📚 Useful Akka.NET Concepts Demonstrated
+### 3\. Start the application
 
-- `ActorSystem`
+The ASP.NET Core project is configured to use the Vue Vite development server through **SPA Proxy**.
 
-- `IMaterializer`
+```bash
+dotnet run --project MarketRateInfo.Server
+```
 
-- `Source.Queue`
+The application starts the frontend development server automatically in Visual Studio/ASP.NET Core development mode when SPA Proxy is enabled.
 
-- `OverflowStrategy.Backpressure`
+The Vite development server is configured for:
 
-- `Throttle`
+```text
+https://localhost:60028
+```
 
-- `SelectAsync`
+The API is exposed under `/api`.
 
-- `Sink.ForEach`
+## API
 
-- `SharedKillSwitch`
+The initial API endpoint is:
 
-- Backpressure propagation
+```text
+GET /api/home
+```
 
-- Stream materialization
+The endpoint reads market-rate information through the repository/Data Access Layer and returns it to the Vue application.
 
-- Graceful completion semantics
+The intended request flow is:
+
+```text
+Vue / Pinia
+    │
+    ▼
+/api/home
+    │
+    ▼
+HomeController
+    │
+    ▼
+IMarketRateRepository
+    │
+    ▼
+MarketRateRepository
+    │
+    ▼
+EF Core
+    │
+    ▼
+SQLite
+```
+
+## Frontend Development
+
+Start Vite directly when frontend-only development is required:
+
+```bash
+cd marketrateinfo.client
+npm run dev
+```
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+## TypeScript
+
+The frontend is fully configured for TypeScript.
+
+Run the Vue/TypeScript type checker with:
+
+```bash
+cd marketrateinfo.client
+npm run typecheck
+```
+
+The project uses `vue-tsc` so that types inside `.vue` single-file components are checked as well.
+
+## Frontend Tests
+
+Frontend tests use **Vitest + Vue Test Library + jsdom**.
+
+Run all UI tests:
+
+```bash
+cd marketrateinfo.client
+npm test
+```
+
+Run tests in watch mode:
+
+```bash
+npm run test:watch
+```
+
+Generate a coverage report:
+
+```bash
+npm run test:coverage
+```
+
+Current UI tests cover the main `Home.vue` behavior, including successful API loading and API error handling.
+
+## Backend Unit Tests
+
+Backend tests use **xUnit**.
+
+Run all .NET tests:
+
+```bash
+dotnet test MarketRateInfo.Server.Tests/MarketRateInfo.Server.Tests.csproj
+```
+
+The repository tests use **SQLite in-memory** rather than EF Core's `InMemory` provider. This means repository tests execute against the SQLite provider used by the application while keeping the database isolated for every test.
+
+Current backend tests cover:
+
+* `MarketRateRepository.GetAllAsync`
+* `MarketRateRepository.GetBySymbolAsync`
+* handling an unknown symbol
+* `HomeController` API behavior
+
+## Run All Checks
+
+A typical local verification sequence is:
+
+```bash
+# Backend
+dotnet restore
+dotnet build
+dotnet test
+
+# Frontend
+cd marketrateinfo.client
+npm install
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+## Configuration
+
+The backend uses the `DefaultConnection` connection string for SQLite.
+
+Example:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=App\_Data/marketrateinfo.db"
+  }
+}
+```
+
+For local development, the application can also fall back to the same SQLite path when the connection string is not configured.
+
+## Development Notes
+
+* Do not commit the generated SQLite database if it is intended to contain only local development data.
+* Keep database access inside `DataAccess` rather than querying `DbContext` directly from controllers.
+* Keep frontend API/state logic separate from UI components as the application grows.
+* Use TypeScript types for API responses and Pinia state.
+* Use repository tests for persistence behavior and Vue Test Library for user-visible UI behavior.
 
 
 
-<img width="2047" height="1050" alt="AdaptiveThrotling" src="https://github.com/user-attachments/assets/03cf58c3-f5d9-46b5-8345-cacf507c1a15" />
+Автоматическое создание администратора в Development:
+
+
+
+admin@marketrateinfo.local
+
+ChangeMe123!
+

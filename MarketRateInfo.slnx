@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="marketrateinfo.client/marketrateinfo.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="MarketRateInfo.Server/MarketRateInfo.Server.csproj" />
+  <Project Path="MarketRateInfo.Server.Tests/MarketRateInfo.Server.Tests.csproj" />
+</Solution>
