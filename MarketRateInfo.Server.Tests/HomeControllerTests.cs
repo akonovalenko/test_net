@@ -1,5 +1,5 @@
 using MarketRateInfo.Server.BusinessLogic.Interfaces;
-using MarketRateInfo.Server.BusinessLogic.Models;
+using MarketRateInfo.Server.BusinessLogic.Models.Responses;
 using MarketRateInfo.Server.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;

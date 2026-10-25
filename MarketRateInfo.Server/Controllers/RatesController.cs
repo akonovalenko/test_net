@@ -1,10 +1,10 @@
 using MarketRateInfo.Server.BusinessLogic.Exceptions;
 using MarketRateInfo.Server.BusinessLogic.Interfaces;
-using MarketRateInfo.Server.BusinessLogic.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using MarketRateInfo.Server.BusinessLogic.ExternalRates.Models;
-using MarketRateInfo.Server.BusinessLogic.Models.Records;
+using MarketRateInfo.Server.BusinessLogic.Models.Requests;
+using MarketRateInfo.Server.BusinessLogic.Models.Responses;
 
 namespace MarketRateInfo.Server.Controllers;
 

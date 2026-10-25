@@ -12,6 +12,9 @@ public sealed class AkkaRuntime : IDisposable
 {
     private readonly ActorSystem _actorSystem;
 
+    /// <summary>
+    /// Initializes a new instance of the AkkaRuntime class and creates the actor system and materializer.
+    /// </summary>
     public AkkaRuntime()
     {
         this._actorSystem = ActorSystem.Create("MarketRateInfoSystem");

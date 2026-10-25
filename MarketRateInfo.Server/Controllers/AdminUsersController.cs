@@ -1,9 +1,9 @@
-using MarketRateInfo.Server.BusinessLogic.Models;
+using MarketRateInfo.Server.BusinessLogic.Models.Requests;
+using MarketRateInfo.Server.BusinessLogic.Models.Responses;
 using MarketRateInfo.Server.DataAccess.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace MarketRateInfo.Server.Controllers;
 

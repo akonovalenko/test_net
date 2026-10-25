@@ -1,7 +1,7 @@
 using MarketRateInfo.Server.BusinessLogic.Interfaces;
-using MarketRateInfo.Server.BusinessLogic.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using MarketRateInfo.Server.BusinessLogic.Models.Responses;
 
 namespace MarketRateInfo.Server.Controllers;
 

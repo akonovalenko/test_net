@@ -19,6 +19,11 @@ public sealed class AdaptiveThrottle
 
     public TimeSpan CurrentDelay => Delays[Volatile.Read(ref _level)];
 
+    /// <summary>
+    /// Asynchronously waits for the current delay interval or until the operation is canceled.
+    /// </summary>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous wait operation.</returns>
     public async Task WaitAsync(CancellationToken cancellationToken = default)
     {
         var delay = CurrentDelay;
@@ -26,6 +31,11 @@ public sealed class AdaptiveThrottle
             await Task.Delay(delay, cancellationToken);
     }
 
+    /// <summary>
+    /// Increments the failure level if it has not reached the maximum allowed value.
+    /// </summary>
+    /// <remarks>Uses thread-safe operations to update the failure level, ensuring correct behavior in
+    /// concurrent scenarios.</remarks>
     public void OnFailure()
     {
         var current = Volatile.Read(ref _level);
@@ -33,5 +43,8 @@ public sealed class AdaptiveThrottle
             Interlocked.CompareExchange(ref _level, current + 1, current);
     }
 
+    /// <summary>
+    /// Resets the internal level indicator to zero in a thread-safe manner.
+    /// </summary>
     public void OnSuccess() => Interlocked.Exchange(ref _level, 0);
 }

@@ -1,6 +1,6 @@
-using System.Text.Json;
 using MarketRateInfo.Server.BusinessLogic.Exceptions;
-using MarketRateInfo.Server.BusinessLogic.Models;
+using MarketRateInfo.Server.BusinessLogic.Models.Responses;
+using System.Text.Json;
 
 namespace MarketRateInfo.Server.Middleware;
 

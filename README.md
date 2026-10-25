@@ -1,119 +1,89 @@
 # MarketRateInfo
 
-MarketRateInfo is a full-stack application built with **ASP.NET Core 10**, **Vue 3**, **TypeScript**, **Entity Framework Core**, and **SQLite**.
+MarketRateInfo is a full-stack market-rate dashboard built with **ASP.NET Core 10**, **C#**, **Entity Framework Core**, **SQLite**, **Vue 3**, **TypeScript**, and **Vite**. It provides currency-pair management, historical rate queries, chart/table views, cookie-based authentication, role-based administration, and a weather widget.
 
-The project provides a clean starting point for a market-rates application with a separate Data Access Layer, API, state management, UI components, and automated tests for both backend and frontend.
+> **Repository snapshot note:** The supplied archive references `MarketRateInfo.Server.BusinessLogic` namespaces from controllers and startup code, but does not contain the corresponding `BusinessLogic` source directory. It also calls `UseCors("DefaultCorsPolicy")` without registering that named policy. Resolve these issues before expecting the supplied snapshot to build and run successfully. The .NET SDK was not available in the review environment, so a backend build/test result could not be verified.
 
-## Technology Stack
+## Features
 
-### Backend
+- Current market-rate overview and historical rate queries by currency pair and date range.
+- Rate history visualization and tabular display.
+- Configurable external rate providers: Frankfurter, ExchangeRate-API, and CoinGecko.
+- Background rate refresh service and manual refresh endpoint for administrators.
+- Currency-pair management for administrators.
+- ASP.NET Core Identity cookie authentication with `Admin` and `User` roles.
+- User registration, login, logout, and current-user endpoints.
+- Admin user management: list, create, update, and delete users.
+- Weather widget in the Vue client.
+- SQLite persistence, EF Core migrations, and xUnit/Vitest test projects.
 
-* .NET 10 / ASP.NET Core Web API
-* C#
-* Entity Framework Core 10
-* SQLite
-* Dependency Injection
-* OpenAPI
-* ASP.NET Core SPA Proxy
+## Technology stack
 
-### Data Access Layer
+### Server
 
-The backend uses a dedicated Data Access Layer:
+- .NET 10 / ASP.NET Core Web API
+- Entity Framework Core 10 with SQLite
+- ASP.NET Core Identity and cookie authentication
+- Serilog console and rolling-file logging
+- Swagger / OpenAPI in Development
+- Akka packages are referenced by the server
 
-```text
-MarketRateInfo.Server/
-└── DataAccess/
-    ├── Entities/
-    │   └── MarketRate.cs
-    ├── Repositories/
-    │   ├── IMarketRateRepository.cs
-    │   └── MarketRateRepository.cs
-    ├── MarketRateDbContext.cs
-    └── DatabaseInitializer.cs
-```
+### Client
 
-The repository layer isolates EF Core and SQLite access from controllers and application code.
+- Vue 3 and TypeScript
+- Vite
+- Pinia for client state
+- Axios for API calls
+- PrimeVue 4 and PrimeIcons
+- Tailwind CSS 4
+- Chart.js
+- Vitest, Vue Testing Library, and jsdom
+- ESLint and Oxlint
 
-SQLite is configured through `DefaultConnection` in `appsettings.json` and defaults to:
-
-```text
-App\_Data/marketrateinfo.db
-```
-
-The database is initialized automatically when the application starts and contains initial market-rate data for development.
-
-### Frontend
-
-* Vue 3
-* TypeScript
-* Vite
-* Pinia
-* PrimeVue
-* PrimeVue Aura theme
-* Tailwind CSS 4
-* Vue Test Library
-* Vitest
-* jsdom
-
-The frontend source is organized as:
-
-```text
-marketrateinfo.client/
-└── src/
-    ├── assets/
-    ├── stores/
-    │   └── app.ts
-    ├── views/
-    │   └── Home.vue
-    ├── App.vue
-    ├── main.ts
-    └── vite-env.d.ts
-```
-
-## Solution Structure
+## Repository structure
 
 ```text
 MarketRateInfo/
-│
-├── MarketRateInfo.sln
-│
+├── MarketRateInfo.slnx
+├── README.md
 ├── MarketRateInfo.Server/
 │   ├── Controllers/
 │   ├── DataAccess/
 │   │   ├── Entities/
 │   │   ├── Repositories/
 │   │   ├── DatabaseInitializer.cs
+│   │   ├── IdentitySeedService.cs
 │   │   └── MarketRateDbContext.cs
-│   ├── App\_Data/
+│   ├── Migrations/
+│   ├── Middleware/
+│   ├── Akka/
 │   ├── Program.cs
-│   └── appsettings.json
-│
+│   ├── appsettings.json
+│   └── appsettings.Development.json
 ├── MarketRateInfo.Server.Tests/
 │   ├── HomeControllerTests.cs
-│   ├── MarketRateRepositoryTests.cs
-│   └── MarketRateInfo.Server.Tests.csproj
-│
+│   └── MarketRateRepositoryTests.cs
 └── marketrateinfo.client/
     ├── src/
+    │   ├── api/
+    │   ├── components/
+    │   ├── stores/
+    │   ├── views/
+    │   └── router.ts
     ├── tests/
-    │   ├── Home.test.ts
-    │   └── setup.ts
     ├── package.json
-    ├── vite.config.ts
-    ├── vitest.config.ts
-    ├── tsconfig.json
-    └── marketrateinfo.client.esproj
+    └── vite.config.ts
 ```
+
+The archive also contains local SQLite database files under `MarketRateInfo.Server/App_Data`. Treat these as local data, not as required source files; avoid committing databases that contain real or personal data.
 
 ## Prerequisites
 
-Install:
+- .NET 10 SDK
+- Node.js **24.1 or later**, as declared in `marketrateinfo.client/package.json`
+- npm
 
-* .NET 10 SDK
-* Node.js 22.18+ or Node.js 24.12+
-* npm
-
-Check the installed versions:
+Check installed versions:
 
 ```bash
 dotnet --version
@@ -121,204 +91,145 @@ node --version
 npm --version
 ```
 
-## Running the Application
+## Run locally
 
-### 1\. Restore backend dependencies
+### 1. Restore .NET dependencies
 
-From the solution directory:
+From the repository root:
 
 ```bash
-dotnet restore
+dotnet restore MarketRateInfo.slnx
 ```
 
-### 2\. Install frontend dependencies
+### 2. Install client dependencies
 
 ```bash
 cd marketrateinfo.client
-npm install
+npm ci
 cd ..
 ```
 
-### 3\. Start the application
+### 3. Configure HTTPS development certificates
 
-The ASP.NET Core project is configured to use the Vue Vite development server through **SPA Proxy**.
+The Vite configuration expects the ASP.NET Core HTTPS development certificate files under the platform's ASP.NET HTTPS certificate directory. If they are not present, it attempts to export one using `dotnet dev-certs`.
+
+On Windows, trust the development certificate if required:
+
+```powershell
+dotnet dev-certs https --trust
+```
+
+### 4. Start the application
+
+The server project configures ASP.NET Core SPA Proxy to launch the Vite development server in the development workflow:
 
 ```bash
 dotnet run --project MarketRateInfo.Server
 ```
 
-The application starts the frontend development server automatically in Visual Studio/ASP.NET Core development mode when SPA Proxy is enabled.
+The Vite development server is configured for `https://localhost:60028`. The Vite proxy forwards `/api` requests to `https://localhost:7000`; verify the server URL against the active launch profile if your local ports differ.
 
-The Vite development server is configured for:
-
-```text
-https://localhost:60028
-```
-
-The API is exposed under `/api`.
-
-## API
-
-The initial API endpoint is:
-
-```text
-GET /api/home
-```
-
-The endpoint reads market-rate information through the repository/Data Access Layer and returns it to the Vue application.
-
-The intended request flow is:
-
-```text
-Vue / Pinia
-    │
-    ▼
-/api/home
-    │
-    ▼
-HomeController
-    │
-    ▼
-IMarketRateRepository
-    │
-    ▼
-MarketRateRepository
-    │
-    ▼
-EF Core
-    │
-    ▼
-SQLite
-```
-
-## Frontend Development
-
-Start Vite directly when frontend-only development is required:
+You can also run the client independently:
 
 ```bash
 cd marketrateinfo.client
 npm run dev
 ```
 
-Create a production build:
+The provided archive should first be completed with the missing `BusinessLogic` sources and the CORS policy registration described in the review note above.
 
-```bash
-npm run build
+## API overview
+
+The API uses cookie authentication. Most market-rate endpoints require an authenticated user; management and refresh endpoints require the `Admin` role.
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | Anonymous | Register a user |
+| `POST` | `/api/auth/login` | Anonymous | Sign in and issue an auth cookie |
+| `POST` | `/api/auth/logout` | Authenticated | Sign out |
+| `GET` | `/api/auth/me` | Authenticated | Get the current user and roles |
+| `GET` | `/api/home` | Authenticated | Get the home dashboard data |
+| `GET` | `/api/rates/symbols` | Authenticated | List available currency pairs |
+| `GET` | `/api/rates?symbol=EUR%2FUSD&from=2026-08-17&to=2026-08-24` | Authenticated | Query historical rates; the supplied server README documents inclusive dates |
+| `POST` | `/api/rates/symbols` | Admin | Add a currency pair and request a refresh for today |
+| `DELETE` | `/api/rates/symbols?symbol=EUR%2FUSD` | Admin | Remove a currency pair |
+| `POST` | `/api/rates/refresh` | Admin | Refresh rates, optionally filtered by symbol and date range |
+| `GET` | `/api/admin/users` | Admin | List users and roles |
+| `POST` | `/api/admin/users` | Admin | Create a user and assign a role |
+| `PUT` | `/api/admin/users/{id}` | Admin | Update a user's email, optional password, and role |
+| `DELETE` | `/api/admin/users/{id}` | Admin | Delete a user |
+| `GET` | `/api/weatherforecast` | Authenticated, based on the controller attributes | Get the weather forecast endpoint used by the client |
+
+Swagger is configured to be enabled only in the Development environment.
+
+## Data and configuration
+
+### SQLite
+
+The server startup code creates `MarketRateInfo.Server/App_Data` and constructs a database path at:
+
+```text
+MarketRateInfo.Server/App_Data/marketrateinfo.db
 ```
 
-Preview the production build:
+It then applies EF Core migrations and ensures the default currency pairs exist. **In the supplied `Program.cs`, the database path is constructed directly rather than read from `ConnectionStrings:DefaultConnection`;** changing that configuration value alone will not redirect the database unless startup code is updated.
 
-```bash
-npm run preview
+### External rate providers
+
+Provider settings are under `MarketRates` in `appsettings.json`:
+
+- `Frankfurter`: base URL, enabled flag, timeout
+- `ExchangeRateApi`: base URL, enabled flag, timeout
+- `CryptoRateApi`: base URL, enabled flag, timeout, optional API key
+
+Provider registration order is documented in the server's dependency-injection code as the fallback order. Store any real API keys in user secrets or environment variables; do not commit secrets.
+
+### Development administrator
+
+The supplied `appsettings.Development.json` contains a development administrator configuration:
+
+```text
+Email:    admin@marketrateinfo.local
+Password: ChangeMe123!
 ```
 
-## TypeScript
+This credential is for local development only. Change it or remove it before any shared or production deployment. Production credentials should be supplied through a secure configuration source such as user secrets for local development or environment/secret-manager configuration for deployment.
 
-The frontend is fully configured for TypeScript.
+## Frontend scripts
 
-Run the Vue/TypeScript type checker with:
-
-```bash
-cd marketrateinfo.client
-npm run typecheck
-```
-
-The project uses `vue-tsc` so that types inside `.vue` single-file components are checked as well.
-
-## Frontend Tests
-
-Frontend tests use **Vitest + Vue Test Library + jsdom**.
-
-Run all UI tests:
+Run these commands from `marketrateinfo.client`:
 
 ```bash
-cd marketrateinfo.client
-npm test
+npm run dev          # Start Vite development server
+npm run build        # Create production client build
+npm run preview      # Preview the production build
+npm run typecheck    # Check TypeScript and Vue component types
+npm run lint         # Run Oxlint and ESLint
+npm test             # Run Vitest once
+npm run test:watch   # Run Vitest in watch mode
+npm run test:coverage # Run tests with coverage
 ```
 
-Run tests in watch mode:
+## Backend tests
 
-```bash
-npm run test:watch
-```
-
-Generate a coverage report:
-
-```bash
-npm run test:coverage
-```
-
-Current UI tests cover the main `Home.vue` behavior, including successful API loading and API error handling.
-
-## Backend Unit Tests
-
-Backend tests use **xUnit**.
-
-Run all .NET tests:
+From the repository root:
 
 ```bash
 dotnet test MarketRateInfo.Server.Tests/MarketRateInfo.Server.Tests.csproj
 ```
 
-The repository tests use **SQLite in-memory** rather than EF Core's `InMemory` provider. This means repository tests execute against the SQLite provider used by the application while keeping the database isolated for every test.
+The included tests cover home-controller behavior and repository operations. The test project references the server project; backend test execution depends on all server source files and dependencies being present.
 
-Current backend tests cover:
+## Review priorities before deployment
 
-* `MarketRateRepository.GetAllAsync`
-* `MarketRateRepository.GetBySymbolAsync`
-* handling an unknown symbol
-* `HomeController` API behavior
+1. **Restore missing source files and register CORS.** The supplied archive does not include the `BusinessLogic` implementation referenced by the server, and `Program.cs` uses a named CORS policy without an `AddCors` registration.
+2. **Protect cookie-authenticated state-changing endpoints against CSRF.** Review antiforgery protection for registration, logout, and administrative POST/PUT/DELETE operations; `SameSite=Lax` is useful but should not be treated as the only CSRF control in every deployment topology.
+3. **Remove the committed development admin password from any production configuration path.** Keep a development-only seed credential only for local development.
+4. **Validate admin-user updates before making changes.** In `AdminUsersController.UpdateUser`, email/user-name updates happen before password confirmation is checked, so a validation failure can still leave part of the update persisted.
+5. **Use asynchronous database queries and cancellation consistently.** `AdminUsersController.GetUsers` currently materializes the user list synchronously and retrieves roles one user at a time.
+6. **Review database path and deployment behavior.** Startup currently hardcodes the SQLite path and performs migrations during application startup; decide whether that is appropriate for the intended deployment and multiple-instance scenarios.
+7. **Add integration/security tests.** Cover auth cookies, role restrictions, CSRF protections, user-management edge cases, provider failures, and migration from an existing database.
 
-## Run All Checks
+## License
 
-A typical local verification sequence is:
-
-```bash
-# Backend
-dotnet restore
-dotnet build
-dotnet test
-
-# Frontend
-cd marketrateinfo.client
-npm install
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-## Configuration
-
-The backend uses the `DefaultConnection` connection string for SQLite.
-
-Example:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=App\_Data/marketrateinfo.db"
-  }
-}
-```
-
-For local development, the application can also fall back to the same SQLite path when the connection string is not configured.
-
-## Development Notes
-
-* Do not commit the generated SQLite database if it is intended to contain only local development data.
-* Keep database access inside `DataAccess` rather than querying `DbContext` directly from controllers.
-* Keep frontend API/state logic separate from UI components as the application grows.
-* Use TypeScript types for API responses and Pinia state.
-* Use repository tests for persistence behavior and Vue Test Library for user-visible UI behavior.
-
-
-
-Автоматическое создание администратора в Development:
-
-
-
-admin@marketrateinfo.local
-
-ChangeMe123!
-
+No license file was included in the supplied archive. Add a license if you intend to publish or distribute the project.
