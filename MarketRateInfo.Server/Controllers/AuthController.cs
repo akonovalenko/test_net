@@ -4,6 +4,7 @@ using MarketRateInfo.Server.DataAccess.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Antiforgery;
 
 namespace MarketRateInfo.Server.Controllers;
 
@@ -11,13 +12,21 @@ namespace MarketRateInfo.Server.Controllers;
 [Route("api/auth")]
 public sealed class AuthController(
     SignInManager<ApplicationUser> signInManager,
-    UserManager<ApplicationUser> userManager) : ControllerBase
+    UserManager<ApplicationUser> userManager,
+    IAntiforgery antiforgery) : ControllerBase
 {
+    [AllowAnonymous]
+    [HttpGet("csrf")]
+    public IActionResult GetAntiforgeryToken()
+    {
+        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+        return Ok(new { token = tokens.RequestToken });
+    }
+
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login(
-        [FromBody] LoginRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] LoginRequest request)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);

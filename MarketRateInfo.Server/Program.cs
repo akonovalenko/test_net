@@ -44,6 +44,29 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // -----------------------------------------------------------------------------
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DefaultCorsPolicy", policy =>
+    {
+        var origins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? ["https://localhost:60028"];
+
+        policy.WithOrigins(origins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "__Host-MarketRateInfo.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.Path = "/";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -120,6 +143,35 @@ app.UseHttpsRedirection();
 
 // Handles CORS before authentication/authorization.
 app.UseCors("DefaultCorsPolicy");
+
+// Validate antiforgery tokens on cookie-authenticated state-changing requests.
+// The SPA obtains a request token from GET /api/auth/csrf before making mutations.
+app.Use(async (context, next) =>
+{
+    var method = context.Request.Method;
+    var requiresAntiforgery = HttpMethods.IsPost(method)
+        || HttpMethods.IsPut(method)
+        || HttpMethods.IsPatch(method)
+        || HttpMethods.IsDelete(method);
+
+    if (requiresAntiforgery &&
+        !context.Request.Path.Equals("/api/auth/csrf", StringComparison.OrdinalIgnoreCase))
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>();
+        try
+        {
+            await antiforgery.ValidateRequestAsync(context);
+        }
+        catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { message = "Invalid or missing antiforgery token." });
+            return;
+        }
+    }
+
+    await next();
+});
 
 // Authentication must execute before authorization.
 app.UseAuthentication();

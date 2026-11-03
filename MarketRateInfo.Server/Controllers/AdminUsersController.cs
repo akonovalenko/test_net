@@ -4,6 +4,8 @@ using MarketRateInfo.Server.DataAccess.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MarketRateInfo.Server.DataAccess;
 
 namespace MarketRateInfo.Server.Controllers;
 
@@ -11,15 +13,17 @@ namespace MarketRateInfo.Server.Controllers;
 [Route("api/admin/users")]
 [Authorize(Roles = "Admin")]
 public sealed class AdminUsersController(
-    UserManager<ApplicationUser> userManager) : ControllerBase
+    UserManager<ApplicationUser> userManager,
+    MarketRateDbContext dbContext) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AdminUserResponse>>> GetUsers(
         CancellationToken cancellationToken)
     {
-        var users = userManager.Users
+        var users = await userManager.Users
+            .AsNoTracking()
             .OrderBy(x => x.Email)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         var result = new List<AdminUserResponse>(users.Count);
 
@@ -40,8 +44,7 @@ public sealed class AdminUsersController(
 
     [HttpPost]
     public async Task<ActionResult<AdminUserResponse>> CreateUser(
-        [FromBody] AdminCreateUserRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] AdminCreateUserRequest request)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
@@ -91,11 +94,17 @@ public sealed class AdminUsersController(
     [HttpPut("{id}")]
     public async Task<ActionResult<AdminUserResponse>> UpdateUser(
         string id,
-        [FromBody] AdminUpdateUserRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] AdminUpdateUserRequest request)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
+
+        if (!string.IsNullOrWhiteSpace(request.Password) &&
+            !string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+        {
+            ModelState.AddModelError(nameof(request.ConfirmPassword), "Passwords do not match.");
+            return ValidationProblem(ModelState);
+        }
 
         var user = await userManager.FindByIdAsync(id);
 
@@ -136,18 +145,17 @@ public sealed class AdminUsersController(
             return ValidationProblem(ModelState);
         }
 
+        // Identity operations use the same scoped DbContext, so a relational
+        // transaction prevents a failed password/role update from leaving only
+        // the email/username change persisted.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
         user.Email = normalizedEmail;
         user.UserName = normalizedEmail;
 
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
             return IdentityValidationProblem(updateResult.Errors);
-
-        if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
-        {
-            ModelState.AddModelError(nameof(request.ConfirmPassword), "Passwords do not match.");
-            return ValidationProblem(ModelState);
-        }
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
@@ -174,13 +182,12 @@ public sealed class AdminUsersController(
                 return IdentityValidationProblem(addRoleResult.Errors);
         }
 
+        await transaction.CommitAsync();
         return Ok(await ToResponseAsync(user));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteUser(
-        string id,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteUser(string id)
     {
         var user = await userManager.FindByIdAsync(id);
 

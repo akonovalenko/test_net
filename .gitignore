@@ -78,3 +78,15 @@ Tests/obj/
 tests/bin/
 tests/obj/
 /Tests/obj/
+
+# Node/Vite dependencies and cache
+node_modules/
+**/node_modules/
+.vite/
+**/.vite/
+
+# Runtime application data (keep migrations/source only)
+MarketRateInfo.Server/App_Data/*.db
+MarketRateInfo.Server/App_Data/*.db-shm
+MarketRateInfo.Server/App_Data/*.db-wal
+MarketRateInfo.Server/Logs/
