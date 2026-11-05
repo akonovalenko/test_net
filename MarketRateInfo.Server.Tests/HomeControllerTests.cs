@@ -1,4 +1,3 @@
-using MarketRateInfo.Server.BusinessLogic.Interfaces;
 using MarketRateInfo.Server.BusinessLogic.Models.Responses;
 using MarketRateInfo.Server.Controllers;
 using Microsoft.AspNetCore.Mvc;
@@ -6,72 +5,42 @@ using Xunit;
 
 namespace MarketRateInfo.Server.Tests;
 
-public sealed class HomeControllerTests
+/// <summary>
+/// the HomeControllerTests class contains unit tests for the HomeController, which is responsible for handling 
+/// requests related to the home endpoint of the Market Rate Info application. 
+/// The tests verify that the controller correctly returns service responses and forwards cancellation tokens 
+/// to the underlying service layer.
+/// </summary>
+public sealed partial class HomeControllerTests
 {
     [Fact]
-    public async Task Get_ReturnsOkWithRates()
+    public async Task Get_ReturnsServiceResponse()
     {
-        var service = new StubMarketRateService(
-            new HomeResponse(
-                Application: "Market Rate Info",
-                Status: "ok",
-                Database: "SQLite",
-                Rates:
-                [
-                    new HomeRateResponse(
-                        Symbol: "EUR/USD",
-                        Rate: 1.17m,
-                        UpdatedAtUtc: DateTime.UtcNow)
-                ]));
+        var expected = new HomeResponse(
+            "Market Rate Info",
+            "ok",
+            "SQLite",
+            [new HomeRateResponse("EUR/USD", 1.17m, DateTime.UtcNow)]);
 
+        var service = new StubMarketRateService { HomeResponse = expected };
         var controller = new HomeController(service);
 
         var result = await controller.Get(CancellationToken.None);
 
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<HomeResponse>(okResult.Value);
-
-        Assert.Equal("Market Rate Info", response.Application);
-        Assert.Equal("ok", response.Status);
-        Assert.Single(response.Rates);
-        Assert.Equal("EUR/USD", response.Rates[0].Symbol);
-        Assert.Equal(1.17m, response.Rates[0].Rate);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(expected, ok.Value);
+        Assert.Equal(1, service.GetHomeCalls);
     }
 
-    private sealed class StubMarketRateService(
-        HomeResponse response) : IMarketRateService
+    [Fact]
+    public async Task Get_ForwardsCancellationToken()
     {
-        public Task<HomeResponse> GetHomeAsync(
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(response);
-        }
+        using var cts = new CancellationTokenSource();
+        var service = new StubMarketRateService();
+        var controller = new HomeController(service);
 
-        public Task<IReadOnlyList<string>> GetSymbolsAsync(
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<string>>([]);
-        }
+        await controller.Get(cts.Token);
 
-        public Task<IReadOnlyList<MarketRateResponse>> GetHistoryAsync(
-            string symbol,
-            DateTime from,
-            DateTime to,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<MarketRateResponse>>([]);
-        }
-
-        // Implemented to satisfy the current IMarketRateService interface.
-        public Task AddCurrencyPairAsync(string symbol, CancellationToken cancellationToken = default)
-        {
-            // Stub: do nothing in tests.
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveCurrencyPairAsync(string symbol, CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
-        }
+        Assert.Equal(cts.Token, service.LastCancellationToken);
     }
 }
